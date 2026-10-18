@@ -1,0 +1,294 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ML OS Performance Optimizer</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            padding: 25px;
+            background: #0a0f1e;
+            color: #e2e8f0;
+            font-family: "Segoe UI", Arial, sans-serif;
+        }
+
+        header {
+            padding: 22px;
+            background: #17233a;
+            border-bottom: 3px solid #3b82f6;
+            border-radius: 12px;
+            margin-bottom: 24px;
+        }
+
+        header h1 { color: #60a5fa; margin-top: 0; }
+
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 18px;
+            margin-bottom: 22px;
+        }
+
+        .card, .section {
+            background: #17233a;
+            padding: 22px;
+            border-radius: 12px;
+            margin-bottom: 22px;
+        }
+
+        .card { text-align: center; }
+
+        .value {
+            font-size: 36px;
+            font-weight: bold;
+            color: #60a5fa;
+            margin-top: 12px;
+        }
+
+        h2 { color: #60a5fa; }
+
+        button {
+            padding: 11px 16px;
+            border: 0;
+            border-radius: 7px;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 4px;
+            background: #2563eb;
+            color: white;
+        }
+
+        button:hover { background: #1d4ed8; }
+
+        .badge {
+            display: inline-block;
+            padding: 10px 18px;
+            border-radius: 20px;
+            background: #334155;
+            font-weight: bold;
+        }
+
+        .normal { color: #34d399; }
+        .medium { color: #fbbf24; }
+        .high { color: #f87171; }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        th, td {
+            padding: 12px 8px;
+            border-bottom: 1px solid #334155;
+        }
+
+        .muted { color: #94a3b8; }
+
+        @media (max-width: 600px) {
+            body { padding: 12px; }
+            .value { font-size: 28px; }
+        }
+    </style>
+</head>
+
+<body>
+<header>
+    <h1>ML-Driven OS Performance Optimizer</h1>
+    <p>Machine Learning · DBMS · Real-Time Monitoring</p>
+    <p id="connection" class="muted">Connecting to system...</p>
+</header>
+
+<div>
+    <button onclick="loadMetrics()">Refresh Metrics</button>
+    <button onclick="window.location.href='/download_report'">
+        Download PDF Report
+    </button>
+</div>
+
+<div class="cards">
+    <div class="card">
+        <h3>CPU USAGE</h3>
+        <div class="value" id="cpu">--</div>
+    </div>
+
+    <div class="card">
+        <h3>RAM USAGE</h3>
+        <div class="value" id="memory">--</div>
+    </div>
+
+    <div class="card">
+        <h3>DISK USAGE</h3>
+        <div class="value" id="disk">--</div>
+    </div>
+</div>
+
+<div class="section">
+    <h2>Network Activity</h2>
+    <p>Data sent: <strong id="sent">--</strong> KB</p>
+    <p>Data received: <strong id="received">--</strong> KB</p>
+</div>
+
+<div class="section">
+    <h2>Machine Learning Prediction</h2>
+    <p>Current status: <span id="badge" class="badge">Waiting...</span></p>
+    <h3>Optimization Suggestions</h3>
+    <ul id="suggestions">
+        <li>Waiting for performance data...</li>
+    </ul>
+</div>
+
+<div class="section">
+    <h2>Performance Trend</h2>
+    <canvas id="performanceChart"></canvas>
+</div>
+
+<div class="section">
+    <h2>Recent Average-Based Estimate</h2>
+    <p>Average CPU usage: <strong id="futureCPU">--</strong>%</p>
+    <p>Average RAM usage: <strong id="futureRAM">--</strong>%</p>
+    <p class="muted">
+        These values summarize recent readings; they are not a validated
+        forecast of future system performance.
+    </p>
+</div>
+
+<div class="section">
+    <h2>Top Processes by Memory Usage</h2>
+    <p class="muted">This table is for monitoring only.</p>
+    <table>
+        <thead>
+            <tr>
+                <th>Process</th>
+                <th>PID</th>
+                <th>RAM %</th>
+            </tr>
+        </thead>
+        <tbody id="processTable">
+            <tr><td colspan="3">Waiting for data...</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<script>
+    let chart = null;
+
+    async function loadMetrics() {
+        const connection = document.getElementById("connection");
+
+        try {
+            connection.textContent = "Updating metrics...";
+
+            const response = await fetch("/metrics");
+
+            if (!response.ok) {
+                throw new Error("Server returned " + response.status);
+            }
+
+            const data = await response.json();
+
+            document.getElementById("cpu").textContent = data.cpu + "%";
+            document.getElementById("memory").textContent = data.memory + "%";
+            document.getElementById("disk").textContent = data.disk + "%";
+
+            document.getElementById("sent").textContent = data.net_sent;
+            document.getElementById("received").textContent = data.net_recv;
+
+            document.getElementById("futureCPU").textContent = data.future_cpu;
+            document.getElementById("futureRAM").textContent = data.future_mem;
+
+            const badge = document.getElementById("badge");
+            badge.textContent = data.prediction;
+            badge.className = "badge";
+
+            if (data.prediction === "High Load") {
+                badge.classList.add("high");
+            } else if (data.prediction === "Medium Load") {
+                badge.classList.add("medium");
+            } else {
+                badge.classList.add("normal");
+            }
+
+            const suggestions = document.getElementById("suggestions");
+            suggestions.replaceChildren();
+
+            data.suggestions.forEach(function (suggestion) {
+                const item = document.createElement("li");
+                item.textContent = suggestion;
+                suggestions.appendChild(item);
+            });
+
+            const processTable = document.getElementById("processTable");
+            processTable.replaceChildren();
+
+            data.processes.forEach(function (process) {
+                const row = document.createElement("tr");
+
+                [process.name, process.pid, process.memory + "%"]
+                    .forEach(function (value) {
+                        const cell = document.createElement("td");
+                        cell.textContent = value;
+                        row.appendChild(cell);
+                    });
+
+                processTable.appendChild(row);
+            });
+
+            const history = data.history;
+
+            if (chart) {
+                chart.destroy();
+            }
+
+            chart = new Chart(
+                document.getElementById("performanceChart"),
+                {
+                    type: "line",
+                    data: {
+                        labels: history.timestamps,
+                        datasets: [
+                            {
+                                label: "CPU %",
+                                data: history.cpu,
+                                borderColor: "#60a5fa"
+                            },
+                            {
+                                label: "RAM %",
+                                data: history.memory,
+                                borderColor: "#a78bfa"
+                            },
+                            {
+                                label: "Disk %",
+                                data: history.disk,
+                                borderColor: "#fbbf24"
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        scales: {
+                            y: { min: 0, max: 100 }
+                        }
+                    }
+                }
+            );
+
+            connection.textContent =
+                "Connected · Last updated: " + new Date().toLocaleTimeString();
+
+        } catch (error) {
+            connection.textContent = "Unable to load metrics: " + error.message;
+        }
+    }
+
+    loadMetrics();
+    setInterval(loadMetrics, 10000);
+</script>
+</body>
+</html>
